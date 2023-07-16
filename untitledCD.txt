@@ -685,7 +685,221 @@ void yyerror(char *s) {
 	fprintf(stderr, "Error: %s\n", s);
 }
 
-*******8.infix2postfix******
+*******8. yac lex infix-postfix*******
+
+//lex
+%{
+#include "y.tab.h"
+%}
+
+%%
+[ \t]   ; // Ignore whitespace
+[0-9]+  { yylval.num = atoi(yytext); return NUM; }
+.       { return yytext[0]; }
+%%
+
+int yywrap() {
+    return 1;
+}
+
+//yacc
+%{
+#include <stdio.h>
+#include <stdlib.h>
+
+extern int yylex(void);
+extern int yyparse(void);
+void yyerror(const char* s);
+
+#define MAX_SIZE 100
+
+char stack[MAX_SIZE];
+int top = -1;
+
+void push(char);
+char pop();
+int precedence(char);
+
+%}
+
+%union {
+    int num;
+}
+
+%token <num> NUM
+%left '+' '-'
+%left '*' '/'
+%nonassoc '(' ')'
+
+%%
+
+start: expr { printf("Postfix: %s\n", $1); free($1); }
+    ;
+
+expr: expr '+' expr { $$ = (char*)malloc(sizeof(char) * (strlen($1) + strlen($3) + 3));
+                        sprintf($$, "%s %s +", $1, $3);
+                        free($1);
+                        free($3); }
+    | expr '-' expr { $$ = (char*)malloc(sizeof(char) * (strlen($1) + strlen($3) + 3));
+                        sprintf($$, "%s %s -", $1, $3);
+                        free($1);
+                        free($3); }
+    | expr '*' expr { $$ = (char*)malloc(sizeof(char) * (strlen($1) + strlen($3) + 3));
+                        sprintf($$, "%s %s *", $1, $3);
+                        free($1);
+                        free($3); }
+    | expr '/' expr { $$ = (char*)malloc(sizeof(char) * (strlen($1) + strlen($3) + 3));
+                        sprintf($$, "%s %s /", $1, $3);
+                        free($1);
+                        free($3); }
+    | '(' expr ')' { $$ = $2; }
+    | NUM { $$ = (char*)malloc(sizeof(char) * (strlen(yytext) + 1));
+            strcpy($$, yytext); }
+    ;
+
+%%
+
+int main() {
+    yyparse();
+    return 0;
+}
+
+void yyerror(const char* s) {
+    fprintf(stderr, "Error: %s\n", s);
+}
+
+void push(char c) {
+    if (top >= MAX_SIZE - 1) {
+        fprintf(stderr, "Stack Overflow\n");
+        exit(1);
+    }
+    stack[++top] = c;
+}
+
+char pop() {
+    if (top == -1) {
+        fprintf(stderr, "Stack Underflow\n");
+        exit(1);
+    }
+    return stack[top--];
+}
+
+int precedence(char c) {
+    switch (c) {
+        case '+':
+        case '-':
+            return 1;
+        case '*':
+        case '/':
+            return 2;
+        default:
+            return 0;
+    }
+}
+
+
+*******9.Back-end of compiler*******
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void generateIntermediateCode(char *expression);
+void printIntermediateCode();
+
+char expressions[100][100];
+char intermediateCode[100][100];
+int numExpressions = 0;
+int numIntermediates = 0;
+
+int main() {
+    char expression[100];
+    printf("Umesh Kumaar 21BCE0493\n");
+    printf("Enter expressions:\n");
+
+    while (1) {
+        fgets(expression, sizeof(expression), stdin);
+        expression[strcspn(expression, "\n")] = '\0';
+
+        if (strcmp(expression, "exit") == 0) {
+            break;
+        }
+
+        strcpy(expressions[numExpressions], expression);
+        numExpressions++;
+    }
+
+    printf("\nIntermediate code:\n");
+
+    for (int i = 0; i < numExpressions; i++) {
+        generateIntermediateCode(expressions[i]);
+    }
+
+    printIntermediateCode();
+
+    return 0;
+}
+
+
+void generateIntermediateCode(char *expression) {
+    char lhs[10], rhs1[10], rhs2[10], operator;
+    int i = 0, j = 0, t = 1;
+
+    while (expression[i] != '=') {
+        lhs[j++] = expression[i++];
+    }
+    lhs[j] = '\0';
+
+    i += 2;
+
+    j = 0;
+    while (expression[i] != '\0') {
+        if (expression[i] == '+' || expression[i] == '-' || expression[i] == '*' || expression[i] == '/') {
+            operator = expression[i++];
+            char temp[4];
+            if (operator == '+') {
+                strcpy(temp, "Add");
+            } else if (operator == '-') {
+                strcpy(temp, "Sub");
+            } else if (operator == '*') {
+                strcpy(temp, "Mul");
+            } else if (operator == '/') {
+                strcpy(temp, "Div");
+            }
+            rhs1[j] = '\0';
+
+            if (expression[i] == '-') {
+                rhs2[0] = '-';
+                j = 1;
+                i++;
+            } else {
+                j = 0;
+            }
+
+            while (expression[i] != '\0' && expression[i] != '+' && expression[i] != '-' && expression[i] != '*' && expression[i] != '/') {
+                rhs2[j++] = expression[i++];
+            }
+            rhs2[j] = '\0';
+
+            sprintf(intermediateCode[numIntermediates++], "mov %s , r%d", lhs, t);
+            sprintf(intermediateCode[numIntermediates++], "%s %s, r%d", temp, rhs2, t);
+            sprintf(intermediateCode[numIntermediates++], "mov r%d, %s", t, lhs);
+            t++;
+        } else {
+            rhs1[j++] = expression[i++];
+        }
+    }
+
+    sprintf(intermediateCode[numIntermediates++], "mov %s , r%d", lhs, t);
+}
+
+void printIntermediateCode() {
+    for (int i = 0; i < numIntermediates; i++) {
+        printf("%s\n", intermediateCode[i]);
+    }
+}
+
+*******10.infix2postfix, quadruple******
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -916,3 +1130,117 @@ int main()
 
     return 0;
 }
+
+*******11. code optimization***********
+
+#include <stdio.h>
+#include <string.h>
+
+struct op {
+    char l;
+    char r[20];
+};
+
+int main() {
+    printf("Umesh Kumaar - 21BCE0493\n");
+    int n, i, j, k, m;
+    char temp, t;
+    struct op op[10], pr[10];
+
+    printf("Enter the number of values: ");
+    scanf("%d", &n);
+
+    for (i = 0; i < n; i++) {
+        printf("Left: ");
+        scanf(" %c", &op[i].l);
+        printf("Right: ");
+        scanf(" %s", op[i].r);
+    }
+
+    printf("Intermediate Code:\n");
+    for (i = 0; i < n; i++) {
+        printf("%c = %s\n", op[i].l, op[i].r);
+    }
+
+    int z = 0;
+    for (i = 0; i < n - 1; i++) {
+        temp = op[i].l;
+        for (j = 0; j < n; j++) {
+            char* p = strchr(op[j].r, temp);
+            if (p) {
+                pr[z].l = op[i].l;
+                strcpy(pr[z].r, op[i].r);
+                z++;
+                break;
+            }
+        }
+    }
+
+    pr[z].l = op[n - 1].l;
+    strcpy(pr[z].r, op[n - 1].r);
+    z++;
+
+    printf("\nAfter Dead Code Elimination:\n");
+    for (k = 0; k < z; k++) {
+        printf("%c = %s\n", pr[k].l, pr[k].r);
+    }
+
+    for (m = 0; m < z; m++) {
+        char* tem = pr[m].r;
+        for (j = m + 1; j < z; j++) {
+            char* p = strstr(tem, pr[j].r);
+            if (p) {
+                t = pr[j].l;
+                pr[j].l = pr[m].l;
+                for (i = 0; i < z; i++) {
+                    char* l = strchr(pr[i].r, t);
+                    if (l) {
+                        int a = l - pr[i].r;
+                        pr[i].r[a] = pr[m].l;
+                    }
+                }
+            }
+        }
+    }
+
+    printf("\nEliminate Common Expression:\n");
+    for (i = 0; i < z; i++) {
+        printf("%c = %s\n", pr[i].l, pr[i].r);
+    }
+
+    for (i = 0; i < z; i++) {
+        for (j = i + 1; j < z; j++) {
+            int q = strcmp(pr[i].r, pr[j].r);
+            if (pr[i].l == pr[j].l && q == 0) {
+                pr[i].l = '\0';
+            }
+        }
+    }
+
+    printf("\nOptimized Code:\n");
+    for (i = 0; i < z; i++) {
+        if (pr[i].l != '\0') {
+            printf("%c = %s\n", pr[i].l, pr[i].r);
+        }
+    }
+    return 0;
+}
+
+
+****************************************
+lex :
+
+goto dir
+flex _codename_.l
+gg lex.yy.c -o _codename_
+_codename_
+
+
+yacc :
+
+flex _codename_.l
+bison -dy _codename_.y
+lex.yy.c y.tab.c
+a
+
+*****************************************
